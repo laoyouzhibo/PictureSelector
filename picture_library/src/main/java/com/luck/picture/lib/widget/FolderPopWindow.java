@@ -58,6 +58,8 @@ public class FolderPopWindow extends PopupWindow {
         this.setAnimationStyle(R.style.PictureThemeWindowStyle);
         this.setFocusable(true);
         this.setOutsideTouchable(true);
+        this.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+        this.setTouchable(true);
         this.update();
         if (PictureSelectionConfig.uiStyle != null) {
             if (PictureSelectionConfig.uiStyle.picture_top_titleArrowUpDrawable != 0) {
