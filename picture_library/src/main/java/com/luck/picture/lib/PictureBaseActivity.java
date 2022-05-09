@@ -374,7 +374,18 @@ public abstract class PictureBaseActivity extends AppCompatActivity {
 
                 @Override
                 public void onSuccess(List<LocalMedia> result) {
+                    if (PictureSelectionConfig.onPictureCompressListener != null) {
+                        PictureSelectionConfig.onPictureCompressListener.onSuccess(result);
+                    }
                     onResult(result);
+                }
+
+                @Override
+                public void onFail(Throwable t) {
+                    super.onFail(t);
+                    if (PictureSelectionConfig.onPictureCompressListener != null) {
+                        PictureSelectionConfig.onPictureCompressListener.onFailed(t);
+                    }
                 }
             });
         } else {
@@ -394,11 +405,17 @@ public abstract class PictureBaseActivity extends AppCompatActivity {
 
                         @Override
                         public void onSuccess(List<LocalMedia> list) {
+                            if (PictureSelectionConfig.onPictureCompressListener != null) {
+                                PictureSelectionConfig.onPictureCompressListener.onSuccess(list);
+                            }
                             onResult(list);
                         }
 
                         @Override
                         public void onError(Throwable e) {
+                            if (PictureSelectionConfig.onPictureCompressListener != null) {
+                                PictureSelectionConfig.onPictureCompressListener.onFailed(e);
+                            }
                             onResult(result);
                         }
                     }).launch();
