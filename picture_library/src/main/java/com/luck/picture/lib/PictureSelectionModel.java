@@ -25,6 +25,7 @@ import com.luck.picture.lib.listener.OnChooseLimitCallback;
 import com.luck.picture.lib.listener.OnCustomCameraInterfaceListener;
 import com.luck.picture.lib.listener.OnCustomImagePreviewCallback;
 import com.luck.picture.lib.listener.OnPermissionsObtainCallback;
+import com.luck.picture.lib.listener.OnPictureCompressListener;
 import com.luck.picture.lib.listener.OnResultCallbackListener;
 import com.luck.picture.lib.listener.OnVideoSelectedPlayCallback;
 import com.luck.picture.lib.style.PictureCropParameterStyle;
@@ -260,6 +261,11 @@ public class PictureSelectionModel {
      */
     public PictureSelectionModel bindCustomChooseLimitListener(OnChooseLimitCallback listener) {
         PictureSelectionConfig.onChooseLimitCallback = new WeakReference<>(listener).get();
+        return this;
+    }
+
+    public PictureSelectionModel bindPictureCompressListener(OnPictureCompressListener listener) {
+        PictureSelectionConfig.onPictureCompressListener = listener;
         return this;
     }
 
