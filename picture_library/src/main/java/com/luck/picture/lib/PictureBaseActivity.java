@@ -374,10 +374,10 @@ public abstract class PictureBaseActivity extends AppCompatActivity {
 
                 @Override
                 public void onSuccess(List<LocalMedia> result) {
-                    onResult(result);
                     if (PictureSelectionConfig.onPictureCompressListener != null) {
                         PictureSelectionConfig.onPictureCompressListener.onSuccess(result);
                     }
+                    onResult(result);
                 }
 
                 @Override
@@ -405,18 +405,18 @@ public abstract class PictureBaseActivity extends AppCompatActivity {
 
                         @Override
                         public void onSuccess(List<LocalMedia> list) {
-                            onResult(list);
                             if (PictureSelectionConfig.onPictureCompressListener != null) {
                                 PictureSelectionConfig.onPictureCompressListener.onSuccess(list);
                             }
+                            onResult(list);
                         }
 
                         @Override
                         public void onError(Throwable e) {
-                            onResult(result);
                             if (PictureSelectionConfig.onPictureCompressListener != null) {
                                 PictureSelectionConfig.onPictureCompressListener.onFailed(e);
                             }
+                            onResult(result);
                         }
                     }).launch();
         }
