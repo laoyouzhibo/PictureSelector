@@ -1236,6 +1236,14 @@ public final class PictureSelectionModel {
     }
 
     /**
+     * 需不需要显示压缩时具体进度条的加载UI
+     */
+    public PictureSelectionModel isShowCompressProgress(boolean isShowCompressProgress) {
+        selectionConfig.isShowCompressProgress = isShowCompressProgress;
+        return this;
+    }
+
+    /**
      * Filter the validity of file size or duration of audio and video
      *
      * @param isFilterSizeDuration

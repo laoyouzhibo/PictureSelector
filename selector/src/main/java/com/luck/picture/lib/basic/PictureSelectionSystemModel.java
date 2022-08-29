@@ -109,6 +109,14 @@ public final class PictureSelectionSystemModel {
     }
 
     /**
+     * 是否要显示压缩时具体进度条的加载UI
+     */
+    public PictureSelectionSystemModel isShowCompressProgress(boolean isShowCompressProgress) {
+        selectionConfig.isShowCompressProgress = isShowCompressProgress;
+        return this;
+    }
+
+    /**
      * Image Compress the engine
      *
      * @param engine Image Compress the engine

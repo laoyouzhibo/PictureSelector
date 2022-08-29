@@ -34,4 +34,10 @@ limitations under the License.
         <attr name="psBottomNormal" format="boolean" />
     </declare-styleable>
 
+    <declare-styleable name="BackgroundProgressArc">
+        <attr name="bgArcColor" format="color"/>
+        <attr name="progressArcColor" format="color"/>
+        <attr name="BackgroundProgressArc_strokeWidth" format="dimension"/>
+    </declare-styleable>
+
 </resources>
