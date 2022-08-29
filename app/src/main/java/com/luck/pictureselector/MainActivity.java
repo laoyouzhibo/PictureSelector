@@ -62,6 +62,7 @@ import com.luck.lib.camerax.SimpleCameraX;
 import com.luck.lib.camerax.listener.OnSimpleXPermissionDeniedListener;
 import com.luck.lib.camerax.listener.OnSimpleXPermissionDescriptionListener;
 import com.luck.lib.camerax.permissions.SimpleXPermissionUtil;
+import com.luck.picture.lib.PictureSelectorFragment;
 import com.luck.picture.lib.PictureSelectorPreviewFragment;
 import com.luck.picture.lib.animators.AnimationType;
 import com.luck.picture.lib.basic.FragmentInjectManager;
@@ -72,6 +73,7 @@ import com.luck.picture.lib.basic.PictureSelectionCameraModel;
 import com.luck.picture.lib.basic.PictureSelectionModel;
 import com.luck.picture.lib.basic.PictureSelectionSystemModel;
 import com.luck.picture.lib.basic.PictureSelector;
+import com.luck.picture.lib.basic.PictureSelectorSupporterActivity;
 import com.luck.picture.lib.config.InjectResourceSource;
 import com.luck.picture.lib.config.PictureConfig;
 import com.luck.picture.lib.config.PictureMimeType;
@@ -190,7 +192,7 @@ public class MainActivity extends AppCompatActivity implements IBridgePictureBeh
             cb_system_album, cb_fast_select, cb_skip_not_gif, cb_not_gif, cb_attach_camera_mode,
             cb_attach_system_mode, cb_camera_zoom, cb_camera_focus, cb_query_sort_order, cb_watermark,
             cb_custom_preview, cb_permission_desc,cb_video_thumbnails, cb_auto_video, cb_selected_anim,
-            cb_video_resume, cb_custom_loading;
+            cb_video_resume, cb_custom_loading, cb_progress_loading;
     private int chooseMode = SelectMimeType.ofAll();
     private boolean isHasLiftDelete;
     private boolean needScaleBig = true;
@@ -253,6 +255,7 @@ public class MainActivity extends AppCompatActivity implements IBridgePictureBeh
         cb_selected_anim = findViewById(R.id.cb_selected_anim);
         cb_time_axis = findViewById(R.id.cb_time_axis);
         cb_custom_loading = findViewById(R.id.cb_custom_loading);
+        cb_progress_loading = findViewById(R.id.cb_progress_loading);
         cb_crop = findViewById(R.id.cb_crop);
         cbPage = findViewById(R.id.cbPage);
         cbEditor = findViewById(R.id.cb_editor);
@@ -464,9 +467,10 @@ public class MainActivity extends AppCompatActivity implements IBridgePictureBeh
                                 .openGallery(chooseMode)
                                 .setSelectorUIStyle(selectorStyle)
                                 .setImageEngine(imageEngine)
+                                .isShowCompressProgress(getIsShowCompressProgress())
                                 .setVideoPlayerEngine(videoPlayerEngine)
                                 .setCropEngine(getCropFileEngine())
-                                .setCompressEngine(getCompressFileEngine())
+                                .setCompressEngine(getCompressEngine())
                                 .setSandboxFileEngine(new MeSandboxFileEngine())
                                 .setCameraInterceptListener(getCustomCameraEvent())
                                 .setRecordAudioInterceptListener(new MeOnRecordAudioInterceptListener())
@@ -997,6 +1001,16 @@ public class MainActivity extends AppCompatActivity implements IBridgePictureBeh
             };
         }
         return null;
+    }
+
+    /**
+     *  具体展示加载的进度
+     */
+    private boolean getIsShowCompressProgress() {
+        if (cb_progress_loading.isChecked()) {
+            return true;
+        }
+        return false;
     }
 
     /**
@@ -1718,6 +1732,8 @@ public class MainActivity extends AppCompatActivity implements IBridgePictureBeh
      */
     @Deprecated
     private static class ImageCompressEngine implements CompressEngine {
+        PictureSelectorSupporterActivity activity = null;
+        PictureSelectorFragment fragment = null;
 
         @Override
         public void onStartCompress(Context context, ArrayList<LocalMedia> list,
@@ -1760,6 +1776,13 @@ public class MainActivity extends AppCompatActivity implements IBridgePictureBeh
 
                         @Override
                         public void onSuccess(int index, File compressFile) {
+                            if (context instanceof PictureSelectorSupporterActivity) {
+                                activity = (PictureSelectorSupporterActivity) context;
+                                if (activity.getSupportFragmentManager().getFragments().get(0).isResumed()) {
+                                    fragment = (PictureSelectorFragment) activity.getSupportFragmentManager().getFragments().get(0);
+                                    fragment.refreshProgressUI(list.size(), index, true);
+                                }
+                            }
                             LocalMedia media = list.get(index);
                             if (compressFile.exists() && !TextUtils.isEmpty(compressFile.getAbsolutePath())) {
                                 media.setCompressed(true);
@@ -1774,6 +1797,12 @@ public class MainActivity extends AppCompatActivity implements IBridgePictureBeh
                         @Override
                         public void onError(int index, Throwable e) {
                             if (index != -1) {
+                                if (context instanceof PictureSelectorSupporterActivity) {
+                                    activity = (PictureSelectorSupporterActivity) context;
+                                    if (activity.getSupportFragmentManager().getFragments().get(0).isResumed()) {
+                                        fragment.refreshProgressUI(list.size(), index, false);
+                                    }
+                                }
                                 LocalMedia media = list.get(index);
                                 media.setCompressed(false);
                                 media.setCompressPath(null);

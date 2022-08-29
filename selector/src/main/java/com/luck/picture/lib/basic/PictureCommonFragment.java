@@ -306,7 +306,7 @@ public abstract class PictureCommonFragment extends Fragment implements IPicture
         }
         if (PictureSelectionConfig.onCustomLoadingListener != null) {
             mLoadingDialog = PictureSelectionConfig.onCustomLoadingListener.create(getAppContext());
-        } else {
+        } else if (PictureSelectionConfig.onCustomLoadingListener == null && !config.isShowCompressProgress) {
             mLoadingDialog = new PictureLoadingDialog(getAppContext());
         }
         setRequestedOrientation();

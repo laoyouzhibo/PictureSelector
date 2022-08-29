@@ -9,6 +9,7 @@ import android.text.TextUtils;
 import android.view.View;
 import android.view.animation.Animation;
 import android.view.animation.AnimationUtils;
+import android.widget.FrameLayout;
 import android.widget.RelativeLayout;
 import android.widget.TextView;
 
@@ -58,6 +59,7 @@ import com.luck.picture.lib.style.PictureSelectorStyle;
 import com.luck.picture.lib.style.SelectMainStyle;
 import com.luck.picture.lib.utils.ActivityCompatHelper;
 import com.luck.picture.lib.utils.AnimUtils;
+import com.luck.picture.lib.utils.BackgroundProgressArc;
 import com.luck.picture.lib.utils.DateUtils;
 import com.luck.picture.lib.utils.DensityUtil;
 import com.luck.picture.lib.utils.DoubleUtils;
@@ -101,6 +103,12 @@ public class PictureSelectorFragment extends PictureCommonFragment
     private CompleteSelectView completeSelectView;
 
     private TextView tvCurrentDataTime;
+
+    private FrameLayout flProgress;
+
+    private BackgroundProgressArc progressArc;
+
+    private TextView tvProgressNum;
 
     private long intervalClickTime = 0;
 
@@ -251,8 +259,12 @@ public class PictureSelectorFragment extends PictureCommonFragment
         titleBar = view.findViewById(R.id.title_bar);
         bottomNarBar = view.findViewById(R.id.bottom_nar_bar);
         tvCurrentDataTime = view.findViewById(R.id.tv_current_data_time);
+        flProgress = view.findViewById(R.id.fl_progress);
+        progressArc = view.findViewById(R.id.progress_bar);
+        tvProgressNum = view.findViewById(R.id.tv_progress_num);
         onCreateLoader();
         initAlbumListPopWindow();
+        initProgress();
         initTitleBar();
         initComplete();
         initRecycler(view);
@@ -264,6 +276,22 @@ public class PictureSelectorFragment extends PictureCommonFragment
         }
     }
 
+    private void initProgress() {
+        if (!config.isShowCompressProgress) {
+            flProgress.setVisibility(View.GONE);
+        }
+    }
+
+    public void refreshProgressUI(Integer maxPictureNum, Integer progress, boolean isSuccess) {
+        if (config.isShowCompressProgress && isSuccess) {
+            Float mProgress = progress.floatValue() / maxPictureNum.floatValue();
+            flProgress.setVisibility(View.VISIBLE);
+            progressArc.setProgress(mProgress);
+            tvProgressNum.setText(progress + "/" + maxPictureNum);
+        } else {
+            flProgress.setVisibility(View.GONE);
+        }
+    }
 
     @Override
     public void onFragmentResume() {
