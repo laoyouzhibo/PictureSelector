@@ -2,23 +2,16 @@ package com.luck.pictureselector;
 
 import android.content.Context;
 import android.graphics.Bitmap;
-import android.graphics.PointF;
-import android.graphics.drawable.Drawable;
 import android.net.Uri;
-import android.view.View;
 import android.widget.ImageView;
 
 import androidx.annotation.NonNull;
 
 import com.luck.picture.lib.config.PictureMimeType;
 import com.luck.picture.lib.engine.ImageEngine;
-import com.luck.picture.lib.listener.OnImageCompleteCallback;
-import com.luck.picture.lib.tools.MediaUtils;
-import com.luck.picture.lib.widget.longimage.ImageSource;
-import com.luck.picture.lib.widget.longimage.ImageViewState;
-import com.luck.picture.lib.widget.longimage.SubsamplingScaleImageView;
+import com.luck.picture.lib.utils.ActivityCompatHelper;
 import com.squareup.picasso.Picasso;
-import com.squareup.picasso.Target;
+import com.squareup.picasso.RequestCreator;
 
 import java.io.File;
 
@@ -38,7 +31,7 @@ public class PicassoEngine implements ImageEngine {
      */
     @Override
     public void loadImage(@NonNull Context context, @NonNull String url, @NonNull ImageView imageView) {
-        if (!ImageLoaderUtils.assertValidRequest(context)){
+        if (!ActivityCompatHelper.assertValidRequest(context)) {
             return;
         }
         VideoRequestHandler videoRequestHandler = new VideoRequestHandler();
@@ -57,67 +50,21 @@ public class PicassoEngine implements ImageEngine {
         }
     }
 
-    /**
-     * 加载网络图片适配长图方案
-     * # 注意：此方法只有加载网络图片才会回调
-     *
-     * @param context
-     * @param url
-     * @param imageView
-     * @param longImageView
-     * @param callback      网络图片加载回调监听 {link after version 2.5.1 Please use the #OnImageCompleteCallback#}
-     */
     @Override
-    public void loadImage(@NonNull Context context, @NonNull String url,
-                          @NonNull ImageView imageView,
-                          SubsamplingScaleImageView longImageView, OnImageCompleteCallback callback) {
-        if (!ImageLoaderUtils.assertValidRequest(context)){
+    public void loadImage(Context context, ImageView imageView, String url, int maxWidth, int maxHeight) {
+        if (!ActivityCompatHelper.assertValidRequest(context)) {
             return;
         }
-        Picasso.get()
-                .load(PictureMimeType.isContent(url) ? Uri.parse(url) : Uri.fromFile(new File(url)))
-                .into(new Target() {
-                    @Override
-                    public void onBitmapLoaded(Bitmap resource, Picasso.LoadedFrom from) {
-                        if (callback != null) {
-                            callback.onHideLoading();
-                        }
-                        if (resource != null) {
-                            boolean eqLongImage = MediaUtils.isLongImg(resource.getWidth(),
-                                    resource.getHeight());
-                            longImageView.setVisibility(eqLongImage ? View.VISIBLE : View.GONE);
-                            imageView.setVisibility(eqLongImage ? View.GONE : View.VISIBLE);
-                            if (eqLongImage) {
-                                // 加载长图
-                                longImageView.setQuickScaleEnabled(true);
-                                longImageView.setZoomEnabled(true);
-                                longImageView.setDoubleTapZoomDuration(100);
-                                longImageView.setMinimumScaleType(SubsamplingScaleImageView.SCALE_TYPE_CENTER_CROP);
-                                longImageView.setDoubleTapZoomDpi(SubsamplingScaleImageView.ZOOM_FOCUS_CENTER);
-                                longImageView.setImage(ImageSource.cachedBitmap(resource),
-                                        new ImageViewState(0, new PointF(0, 0), 0));
-                            } else {
-                                // 普通图片
-                                imageView.setImageBitmap(resource);
-                            }
-                        }
-                    }
-
-                    @Override
-                    public void onBitmapFailed(Exception e, Drawable errorDrawable) {
-                        if (callback != null) {
-                            callback.onHideLoading();
-                        }
-                    }
-
-                    @Override
-                    public void onPrepareLoad(Drawable placeHolderDrawable) {
-                        if (callback != null) {
-                            callback.onShowLoading();
-                        }
-                    }
-                });
+        Picasso picasso = new Picasso.Builder(context)
+                .build();
+        RequestCreator request = picasso.load(PictureMimeType.isContent(url) ? Uri.parse(url) : Uri.fromFile(new File(url)));
+        request.config(Bitmap.Config.RGB_565);
+        if (maxWidth > 0 && maxHeight > 0) {
+            request.resize(maxWidth, maxHeight);
+        }
+        request.into(imageView);
     }
+
 
     /**
      * 加载相册目录
@@ -127,8 +74,8 @@ public class PicassoEngine implements ImageEngine {
      * @param imageView 承载图片ImageView
      */
     @Override
-    public void loadFolderImage(@NonNull Context context, @NonNull String url, @NonNull ImageView imageView) {
-        if (!ImageLoaderUtils.assertValidRequest(context)){
+    public void loadAlbumCover(@NonNull Context context, @NonNull String url, @NonNull ImageView imageView) {
+        if (!ActivityCompatHelper.assertValidRequest(context)) {
             return;
         }
         VideoRequestHandler videoRequestHandler = new VideoRequestHandler();
@@ -138,7 +85,8 @@ public class PicassoEngine implements ImageEngine {
                     .resize(180, 180)
                     .centerCrop()
                     .noFade()
-                    .placeholder(R.drawable.picture_image_placeholder)
+                    .transform(new RoundedCornersTransform(8))
+                    .placeholder(R.drawable.ps_image_placeholder)
                     .into(imageView);
         } else {
             if (PictureMimeType.isUrlHasVideo(url)) {
@@ -149,7 +97,8 @@ public class PicassoEngine implements ImageEngine {
                         .resize(180, 180)
                         .centerCrop()
                         .noFade()
-                        .placeholder(R.drawable.picture_image_placeholder)
+                        .transform(new RoundedCornersTransform(8))
+                        .placeholder(R.drawable.ps_image_placeholder)
                         .into(imageView);
             } else {
                 Picasso.get()
@@ -157,7 +106,8 @@ public class PicassoEngine implements ImageEngine {
                         .resize(180, 180)
                         .centerCrop()
                         .noFade()
-                        .placeholder(R.drawable.picture_image_placeholder)
+                        .transform(new RoundedCornersTransform(8))
+                        .placeholder(R.drawable.ps_image_placeholder)
                         .into(imageView);
             }
         }
@@ -173,7 +123,7 @@ public class PicassoEngine implements ImageEngine {
      */
     @Override
     public void loadGridImage(@NonNull Context context, @NonNull String url, @NonNull ImageView imageView) {
-        if (!ImageLoaderUtils.assertValidRequest(context)){
+        if (!ActivityCompatHelper.assertValidRequest(context)) {
             return;
         }
         VideoRequestHandler videoRequestHandler = new VideoRequestHandler();
@@ -183,7 +133,7 @@ public class PicassoEngine implements ImageEngine {
                     .resize(200, 200)
                     .centerCrop()
                     .noFade()
-                    .placeholder(R.drawable.picture_image_placeholder)
+                    .placeholder(R.drawable.ps_image_placeholder)
                     .into(imageView);
         } else {
             if (PictureMimeType.isUrlHasVideo(url)) {
@@ -194,7 +144,7 @@ public class PicassoEngine implements ImageEngine {
                         .resize(200, 200)
                         .centerCrop()
                         .noFade()
-                        .placeholder(R.drawable.picture_image_placeholder)
+                        .placeholder(R.drawable.ps_image_placeholder)
                         .into(imageView);
             } else {
                 Picasso.get()
@@ -202,25 +152,31 @@ public class PicassoEngine implements ImageEngine {
                         .resize(200, 200)
                         .centerCrop()
                         .noFade()
-                        .placeholder(R.drawable.picture_image_placeholder)
+                        .placeholder(R.drawable.ps_image_placeholder)
                         .into(imageView);
             }
         }
     }
 
+    @Override
+    public void pauseRequests(Context context) {
+        Picasso.get().pauseTag(context);
+    }
+
+    @Override
+    public void resumeRequests(Context context) {
+        Picasso.get().resumeTag(context);
+    }
+
+
     private PicassoEngine() {
     }
 
-    private static PicassoEngine instance;
+    private static final class InstanceHolder {
+        static final PicassoEngine instance = new PicassoEngine();
+    }
 
     public static PicassoEngine createPicassoEngine() {
-        if (null == instance) {
-            synchronized (PicassoEngine.class) {
-                if (null == instance) {
-                    instance = new PicassoEngine();
-                }
-            }
-        }
-        return instance;
+        return InstanceHolder.instance;
     }
 }

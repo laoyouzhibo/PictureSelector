@@ -1,1 +1,3 @@
-include ':app', ':picture_library', ':ucrop'
+include ':app', ':selector',':ucrop',':compress'
+include ':camerax'
+include ':ijkplayer-java'
