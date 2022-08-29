@@ -63,6 +63,7 @@ public class LocalMedia implements Parcelable {
      * If the cut
      */
     private boolean isCut;
+
     /**
      * media position of list
      */
@@ -321,13 +322,13 @@ public class LocalMedia implements Parcelable {
      * @param height           资源高
      * @param size             资源大小
      * @param bucketId         文件目录id
-     * @param dateAddedColumn  资源添加时间
+     * @param dateAdded  资源添加时间
      * @return
      */
     public static LocalMedia parseLocalMedia(long id, String path, String absolutePath,
                                              String fileName, String parentFolderName,
                                              long duration, int chooseModel, String mimeType,
-                                             int width, int height, long size, long bucketId, long dateAddedColumn) {
+                                             int width, int height, long size, long bucketId, long dateAdded) {
         LocalMedia localMedia = new LocalMedia();
         localMedia.setId(id);
         localMedia.setPath(path);
@@ -341,7 +342,7 @@ public class LocalMedia implements Parcelable {
         localMedia.setHeight(height);
         localMedia.setSize(size);
         localMedia.setBucketId(bucketId);
-        localMedia.setDateAddedTime(dateAddedColumn);
+        localMedia.setDateAddedTime(dateAdded);
         return localMedia;
     }
 
@@ -403,7 +404,7 @@ public class LocalMedia implements Parcelable {
     }
 
     public boolean isCut() {
-        return isCut;
+        return isCut && !TextUtils.isEmpty(getCutPath());
     }
 
     public void setCut(boolean cut) {
@@ -435,7 +436,7 @@ public class LocalMedia implements Parcelable {
     }
 
     public boolean isCompressed() {
-        return compressed;
+        return compressed && !TextUtils.isEmpty(getCompressPath());
     }
 
     public void setCompressed(boolean compressed) {
@@ -597,6 +598,10 @@ public class LocalMedia implements Parcelable {
         isEditorImage = editorImage;
     }
 
+    public boolean isToSandboxPath(){
+        return !TextUtils.isEmpty(getAndroidQToPath());
+    }
+
     @Override
     public String toString() {
         return "LocalMedia{" +
@@ -627,8 +632,6 @@ public class LocalMedia implements Parcelable {
                 ", fileName='" + fileName + '\'' +
                 ", parentFolderName='" + parentFolderName + '\'' +
                 ", orientation=" + orientation +
-                ", loadLongImageStatus=" + loadLongImageStatus +
-                ", isLongImage=" + isLongImage +
                 ", bucketId=" + bucketId +
                 ", isMaxSelectEnabledMask=" + isMaxSelectEnabledMask +
                 ", isEditorImage=" + isEditorImage +

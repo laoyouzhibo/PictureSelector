@@ -39,7 +39,7 @@ import java.util.Objects;
  */
 
 public class PictureFileUtils {
-    private static final int BYTE_SIZE = 8192;
+    private static final int BYTE_SIZE = 1024;
     public static final String POSTFIX = ".jpeg";
     public static final String POST_VIDEO = ".mp4";
     public static final String POST_AUDIO = ".amr";
@@ -245,7 +245,7 @@ public class PictureFileUtils {
                 final String type = split[0];
 
                 if ("primary".equalsIgnoreCase(type)) {
-                    if (SdkVersionUtils.checkedAndroid_Q()) {
+                    if (SdkVersionUtils.isQ()) {
                         return context.getExternalFilesDir(Environment.DIRECTORY_PICTURES) + "/" + split[1];
                     } else {
                         return Environment.getExternalStorageDirectory() + "/" + split[1];
@@ -317,8 +317,8 @@ public class PictureFileUtils {
         FileChannel outputChannel = null;
         FileChannel inputChannel = null;
         try {
-            inputChannel = new FileInputStream(new File(pathFrom)).getChannel();
-            outputChannel = new FileOutputStream(new File(pathTo)).getChannel();
+            inputChannel = new FileInputStream(pathFrom).getChannel();
+            outputChannel = new FileOutputStream(pathTo).getChannel();
             inputChannel.transferTo(0, inputChannel.size(), outputChannel);
         } catch (Exception e) {
             e.printStackTrace();
@@ -328,32 +328,6 @@ public class PictureFileUtils {
         }
     }
 
-
-    /**
-     * Copies one file into the other with the given paths.
-     * In the event that the paths are the same, trying to copy one file to the other
-     * will cause both files to become null.
-     * Simply skipping this step if the paths are identical.
-     */
-    public static boolean copyFile(FileInputStream fileInputStream, String outFilePath) {
-        if (fileInputStream == null) {
-            return false;
-        }
-        FileChannel inputChannel = null;
-        FileChannel outputChannel = null;
-        try {
-            inputChannel = fileInputStream.getChannel();
-            outputChannel = new FileOutputStream(new File(outFilePath)).getChannel();
-            inputChannel.transferTo(0, inputChannel.size(), outputChannel);
-            return true;
-        } catch (Exception e) {
-            return false;
-        } finally {
-            close(fileInputStream);
-            close(inputChannel);
-            close(outputChannel);
-        }
-    }
 
     /**
      * 复制文件
@@ -372,6 +346,7 @@ public class PictureFileUtils {
             for (int len; (len = isBuffer.read(data)) != -1; ) {
                 os.write(data, 0, len);
             }
+            os.flush();
             return true;
         } catch (Exception e) {
             e.printStackTrace();

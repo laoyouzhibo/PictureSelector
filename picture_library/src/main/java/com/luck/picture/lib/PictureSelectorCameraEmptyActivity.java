@@ -5,7 +5,6 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Bundle;
-import android.os.Environment;
 import android.text.TextUtils;
 import android.view.Gravity;
 import android.view.Window;
@@ -24,12 +23,13 @@ import com.luck.picture.lib.entity.LocalMedia;
 import com.luck.picture.lib.immersive.ImmersiveManage;
 import com.luck.picture.lib.permissions.PermissionChecker;
 import com.luck.picture.lib.tools.BitmapUtils;
-import com.luck.picture.lib.tools.DateUtils;
+import com.luck.picture.lib.tools.AlbumUtils;
 import com.luck.picture.lib.tools.MediaUtils;
 import com.luck.picture.lib.tools.PictureFileUtils;
 import com.luck.picture.lib.tools.SdkVersionUtils;
 import com.luck.picture.lib.tools.ToastUtils;
 import com.luck.picture.lib.tools.ValueOf;
+import com.luck.picture.lib.tools.CameraFileUtils;
 import com.yalantis.ucrop.UCrop;
 
 import java.io.File;
@@ -107,19 +107,8 @@ public class PictureSelectorCameraEmptyActivity extends PictureBaseActivity {
      * open camera
      */
     private void onTakePhoto() {
-        if (PermissionChecker
-                .checkSelfPermission(this, Manifest.permission.CAMERA)) {
-            boolean isPermissionChecker = true;
-            if (config != null && config.isUseCustomCamera) {
-                isPermissionChecker = PermissionChecker.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO);
-            }
-            if (isPermissionChecker) {
-                startCamera();
-            } else {
-                PermissionChecker
-                        .requestPermissions(this,
-                                new String[]{Manifest.permission.RECORD_AUDIO}, PictureConfig.APPLY_RECORD_AUDIO_PERMISSIONS_CODE);
-            }
+        if (PermissionChecker.checkSelfPermission(this, Manifest.permission.CAMERA)) {
+            startCamera();
         } else {
             PermissionChecker.requestPermissions(this,
                     new String[]{Manifest.permission.CAMERA}, PictureConfig.APPLY_CAMERA_PERMISSIONS_CODE);
@@ -197,9 +186,9 @@ public class PictureSelectorCameraEmptyActivity extends PictureBaseActivity {
         String cutPath = resultUri.getPath();
         boolean isCutEmpty = TextUtils.isEmpty(cutPath);
         LocalMedia media = LocalMedia.parseLocalMedia(config.cameraPath, config.isCamera ? 1 : 0, config.chooseMode);
-        if (SdkVersionUtils.checkedAndroid_Q()) {
-            int lastIndexOf = config.cameraPath.lastIndexOf("/") + 1;
-            media.setId(lastIndexOf > 0 ? ValueOf.toLong(config.cameraPath.substring(lastIndexOf)) : -1);
+        if (SdkVersionUtils.isQ()) {
+            int lastIndexOf = TextUtils.isEmpty(config.cameraPath) ? 0 : config.cameraPath.lastIndexOf("/") + 1;
+            media.setId(lastIndexOf > 0 ? ValueOf.toLong(config.cameraPath.substring(lastIndexOf)) : System.currentTimeMillis());
             media.setAndroidQToPath(cutPath);
         } else {
             // Taking a photo generates a temporary id
@@ -261,9 +250,9 @@ public class PictureSelectorCameraEmptyActivity extends PictureBaseActivity {
                 if (TextUtils.isEmpty(config.cameraPath)) {
                     return;
                 }
-                if (SdkVersionUtils.checkedAndroid_R()) {
+                if (SdkVersionUtils.isR()) {
                     try {
-                        Uri audioOutUri = MediaUtils.createAudioUri(getContext(), TextUtils.isEmpty(config.cameraAudioFormat) ? config.suffixType : config.cameraAudioFormat);
+                        Uri audioOutUri = CameraFileUtils.createAudioUri(getContext(), TextUtils.isEmpty(config.cameraAudioFormatForQ) ? config.suffixType : config.cameraAudioFormatForQ);
                         if (audioOutUri != null) {
                             InputStream inputStream = PictureContentResolver.getContentResolverOpenInputStream(this, Uri.parse(config.cameraPath));
                             OutputStream outputStream = PictureContentResolver.getContentResolverOpenOutputStream(this, audioOutUri);
@@ -301,12 +290,16 @@ public class PictureSelectorCameraEmptyActivity extends PictureBaseActivity {
                     MediaExtraInfo mediaExtraInfo = MediaUtils.getAudioSize(getContext(), config.cameraPath);
                     media.setDuration(mediaExtraInfo.getDuration());
                 }
-                int lastIndexOf = config.cameraPath.lastIndexOf("/") + 1;
-                media.setId(lastIndexOf > 0 ? ValueOf.toLong(config.cameraPath.substring(lastIndexOf)) : -1);
+                int lastIndexOf = TextUtils.isEmpty(config.cameraPath) ? 0 : config.cameraPath.lastIndexOf("/") + 1;
+                media.setId(lastIndexOf > 0 ? ValueOf.toLong(config.cameraPath.substring(lastIndexOf)) : System.currentTimeMillis());
                 media.setRealPath(path);
                 // Custom photo has been in the application sandbox into the file
                 String mediaPath = intent != null ? intent.getStringExtra(PictureConfig.EXTRA_MEDIA_PATH) : null;
-                media.setAndroidQToPath(mediaPath);
+                media.setAndroidQToPath(!PictureMimeType.isContent(mediaPath) ? mediaPath : null);
+
+                long bucketId = AlbumUtils.generateCameraBucketId(getContext(), cameraFile, "");
+                media.setBucketId(bucketId);
+                media.setDateAddedTime(cameraFile.lastModified() / 1000);
             } else {
                 File cameraFile = new File(config.cameraPath);
                 mimeType = PictureMimeType.getImageMimeType(config.cameraPath,config.cameraMimeType);
@@ -329,23 +322,30 @@ public class PictureSelectorCameraEmptyActivity extends PictureBaseActivity {
                 // Taking a photo generates a temporary id
                 media.setId(System.currentTimeMillis());
                 media.setRealPath(config.cameraPath);
+                // Custom photo has been in the application sandbox into the file
+                String mediaPath = intent != null ? intent.getStringExtra(PictureConfig.EXTRA_MEDIA_PATH) : null;
+                if (SdkVersionUtils.isQ()){
+                    if (!TextUtils.isEmpty(mediaPath) && !PictureMimeType.isContent(mediaPath)) {
+                        media.setAndroidQToPath(mediaPath);
+                    } else {
+                        media.setAndroidQToPath(config.cameraPath);
+                    }
+                }
+
+                long bucketId = AlbumUtils.generateCameraBucketId(getContext(), cameraFile, config.outPutCameraPath);
+                media.setBucketId(bucketId);
+                media.setDateAddedTime(cameraFile.lastModified() / 1000);
             }
             media.setPath(config.cameraPath);
             media.setMimeType(mimeType);
-            if (SdkVersionUtils.checkedAndroid_Q() && PictureMimeType.isHasVideo(media.getMimeType())) {
-                media.setParentFolderName(Environment.DIRECTORY_MOVIES);
-            } else {
-                media.setParentFolderName(PictureMimeType.CAMERA);
-            }
-            media.setChooseModel(config.chooseMode);
-            long bucketId = MediaUtils.getCameraFirstBucketId(getContext());
-            media.setBucketId(bucketId);
+            String folderName = AlbumUtils.generateCameraFolderName(config.cameraPath, mimeType, config.outPutCameraPath);
+            media.setParentFolderName(folderName);
 
-            media.setDateAddedTime(DateUtils.getCurrentTimeMillis());
+            media.setChooseModel(config.chooseMode);
 
             dispatchCameraHandleResult(media);
 
-            if (SdkVersionUtils.checkedAndroid_Q()) {
+            if (SdkVersionUtils.isQ()) {
                 if (PictureMimeType.isHasVideo(media.getMimeType()) && PictureMimeType.isContent(config.cameraPath)) {
                     if (config.isFallbackVersion3) {
                         new PictureMediaScannerConnection(getContext(), media.getRealPath());
@@ -380,7 +380,7 @@ public class PictureSelectorCameraEmptyActivity extends PictureBaseActivity {
         boolean isHasImage = PictureMimeType.isHasImage(media.getMimeType());
         if (config.enableCrop && !config.isCheckOriginalImage && isHasImage) {
             config.originalPath = config.cameraPath;
-            UCropManager.ofCrop(this, config.cameraPath, media.getMimeType());
+            UCropManager.ofCrop(this, config.cameraPath, media.getMimeType(),media.getWidth(),media.getHeight());
         } else if (config.isCompress && isHasImage) {
             List<LocalMedia> result = new ArrayList<>();
             result.add(media);
@@ -416,22 +416,13 @@ public class PictureSelectorCameraEmptyActivity extends PictureBaseActivity {
                     ToastUtils.s(getContext(), getString(R.string.picture_camera));
                 }
                 break;
-            case PictureConfig.APPLY_RECORD_AUDIO_PERMISSIONS_CODE:
-                // Recording Permissions
-                if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                    onTakePhoto();
-                } else {
-                    exit();
-                    ToastUtils.s(getContext(), getString(R.string.picture_audio));
-                }
-                break;
         }
     }
 
 
     @Override
     public void onBackPressed() {
-        if (SdkVersionUtils.checkedAndroid_Q()) {
+        if (SdkVersionUtils.isQ()) {
             finishAfterTransition();
         } else {
             super.onBackPressed();

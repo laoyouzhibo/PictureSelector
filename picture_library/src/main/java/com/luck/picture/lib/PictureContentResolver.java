@@ -3,6 +3,8 @@ package com.luck.picture.lib;
 import android.content.Context;
 import android.net.Uri;
 
+import com.luck.picture.lib.io.ArrayPoolProvide;
+
 import java.io.InputStream;
 import java.io.OutputStream;
 
@@ -20,13 +22,8 @@ public final class PictureContentResolver {
      * @param uri
      * @return
      */
-    public static synchronized InputStream getContentResolverOpenInputStream(Context context, Uri uri) {
-        try {
-            return context.getContentResolver().openInputStream(uri);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        return null;
+    public static InputStream getContentResolverOpenInputStream(Context context, Uri uri) {
+        return ArrayPoolProvide.getInstance().openInputStream(context.getContentResolver(), uri);
     }
 
     /**
@@ -36,7 +33,7 @@ public final class PictureContentResolver {
      * @param uri
      * @return
      */
-    public static synchronized OutputStream getContentResolverOpenOutputStream(Context context, Uri uri) {
+    public static OutputStream getContentResolverOpenOutputStream(Context context, Uri uri) {
         try {
             return context.getContentResolver().openOutputStream(uri);
         } catch (Exception e) {

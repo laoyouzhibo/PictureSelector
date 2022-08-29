@@ -4,6 +4,7 @@ import android.Manifest;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.content.res.Configuration;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
@@ -29,17 +30,19 @@ import com.luck.picture.lib.entity.LocalMedia;
 import com.luck.picture.lib.entity.LocalMediaFolder;
 import com.luck.picture.lib.immersive.ImmersiveManage;
 import com.luck.picture.lib.immersive.NavBarUtils;
+import com.luck.picture.lib.io.ArrayPoolProvide;
 import com.luck.picture.lib.language.PictureLanguageUtils;
 import com.luck.picture.lib.listener.OnCallbackListener;
+import com.luck.picture.lib.model.IBridgeMediaLoader;
+import com.luck.picture.lib.model.LocalMediaLoader;
 import com.luck.picture.lib.model.LocalMediaPageLoader;
 import com.luck.picture.lib.permissions.PermissionChecker;
+import com.luck.picture.lib.style.PictureWindowAnimationStyle;
 import com.luck.picture.lib.thread.PictureThreadUtils;
 import com.luck.picture.lib.tools.AndroidQTransformUtils;
 import com.luck.picture.lib.tools.AttrsUtils;
-import com.luck.picture.lib.tools.MediaUtils;
-import com.luck.picture.lib.tools.PictureFileUtils;
+import com.luck.picture.lib.tools.CameraFileUtils;
 import com.luck.picture.lib.tools.SdkVersionUtils;
-import com.luck.picture.lib.tools.StringUtils;
 import com.luck.picture.lib.tools.ToastUtils;
 import com.luck.picture.lib.tools.VoiceUtils;
 
@@ -76,6 +79,11 @@ public abstract class PictureBaseActivity extends AppCompatActivity {
      * is onSaveInstanceState
      */
     protected boolean isOnSaveInstanceState;
+
+    /**
+     * Base LocalMedia Loader class
+     */
+    protected IBridgeMediaLoader mLoader;
 
     /**
      * Whether to use immersion, subclasses copy the method to determine whether to use immersion
@@ -143,7 +151,9 @@ public abstract class PictureBaseActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         config = PictureSelectionConfig.getInstance();
-        PictureLanguageUtils.setAppLanguage(getContext(), config.language);
+        if (config.language != PictureConfig.UNKNOWN_LANGUAGE) {
+            PictureLanguageUtils.setAppLanguage(getContext(), config.language);
+        }
         setTheme(config.themeStyleId == 0 ? R.style.picture_default_style : config.themeStyleId);
         super.onCreate(savedInstanceState);
         newCreateEngine();
@@ -168,9 +178,21 @@ public abstract class PictureBaseActivity extends AppCompatActivity {
         if (layoutResID != 0) {
             setContentView(layoutResID);
         }
+        initLoader();
         initWidgets();
         initPictureSelectorStyle();
         isOnSaveInstanceState = false;
+    }
+
+    /**
+     * init LocalMedia Loader
+     */
+    protected void initLoader() {
+        if (config.isPageStrategy) {
+            mLoader = new LocalMediaPageLoader(getContext(), config);
+        } else {
+            mLoader = new LocalMediaLoader(getContext(), config);
+        }
     }
 
     /**
@@ -199,13 +221,20 @@ public abstract class PictureBaseActivity extends AppCompatActivity {
 
     @Override
     protected void attachBaseContext(Context newBase) {
-        if (config == null) {
+        if (config == null || config.language == PictureConfig.UNKNOWN_LANGUAGE) {
             super.attachBaseContext(newBase);
         } else {
             super.attachBaseContext(PictureContextWrapper.wrap(newBase, config.language));
         }
     }
 
+    @Override
+    public void onConfigurationChanged(@NonNull Configuration newConfig) {
+        super.onConfigurationChanged(newConfig);
+        if (config.language != PictureConfig.UNKNOWN_LANGUAGE) {
+            PictureLanguageUtils.setAppLanguage(getContext(), config.language);
+        }
+    }
 
     /**
      * setNewRequestedOrientation
@@ -357,7 +386,7 @@ public abstract class PictureBaseActivity extends AppCompatActivity {
      */
     private void compressToLuban(List<LocalMedia> result) {
         if (config.synOrAsy) {
-            PictureThreadUtils.executeBySingle(new PictureThreadUtils.SimpleTask<List<LocalMedia>>() {
+            PictureThreadUtils.executeByIo(new PictureThreadUtils.SimpleTask<List<LocalMedia>>() {
 
                 @Override
                 public List<LocalMedia> doInBackground() throws Exception {
@@ -374,6 +403,7 @@ public abstract class PictureBaseActivity extends AppCompatActivity {
 
                 @Override
                 public void onSuccess(List<LocalMedia> result) {
+                    PictureThreadUtils.cancel(PictureThreadUtils.getIoPool());
                     onResult(result);
                 }
             });
@@ -470,7 +500,7 @@ public abstract class PictureBaseActivity extends AppCompatActivity {
      * @param images
      */
     protected void onResult(List<LocalMedia> images) {
-        if (SdkVersionUtils.checkedAndroid_Q() && config.isAndroidQTransform) {
+        if (SdkVersionUtils.isQ() && config.isAndroidQTransform) {
             onResultToAndroidAsy(images);
         } else {
             dismissDialog();
@@ -508,7 +538,7 @@ public abstract class PictureBaseActivity extends AppCompatActivity {
             if (media == null || TextUtils.isEmpty(media.getPath())) {
                 continue;
             }
-            if (config.isCheckOriginalImage || (!media.isCut() && !media.isCompressed() && TextUtils.isEmpty(media.getAndroidQToPath()))) {
+            if (config.isCheckOriginalImage || (!media.isCut() && !media.isCompressed() && !media.isToSandboxPath())) {
                 isNextCopyAndroidQToPath = true;
                 break;
             }
@@ -559,7 +589,7 @@ public abstract class PictureBaseActivity extends AppCompatActivity {
      */
     private void startThreadCopySandbox(List<LocalMedia> images) {
         showPleaseDialog();
-        PictureThreadUtils.executeBySingle(new PictureThreadUtils.SimpleTask<List<LocalMedia>>() {
+        PictureThreadUtils.executeByIo(new PictureThreadUtils.SimpleTask<List<LocalMedia>>() {
             @Override
             public List<LocalMedia> doInBackground() {
                 int size = images.size();
@@ -568,7 +598,7 @@ public abstract class PictureBaseActivity extends AppCompatActivity {
                     if (media == null || TextUtils.isEmpty(media.getPath())) {
                         continue;
                     }
-                    boolean isCopyAndroidQToPath = !media.isCut() && !media.isCompressed() && TextUtils.isEmpty(media.getAndroidQToPath());
+                    boolean isCopyAndroidQToPath = !media.isCut() && !media.isCompressed() && !media.isToSandboxPath();
                     boolean isCopyPath = false;
                     if (isCopyAndroidQToPath && PictureMimeType.isContent(media.getPath())) {
                         if (!PictureMimeType.isHasHttp(media.getPath())) {
@@ -596,6 +626,7 @@ public abstract class PictureBaseActivity extends AppCompatActivity {
 
             @Override
             public void onSuccess(List<LocalMedia> images) {
+                PictureThreadUtils.cancel(PictureThreadUtils.getIoPool());
                 dismissDialog();
                 if (images != null) {
                     if (config.camera && config.selectionMode == PictureConfig.MULTIPLE) {
@@ -671,50 +702,38 @@ public abstract class PictureBaseActivity extends AppCompatActivity {
 
 
     /**
+     * Open Custom Camera
+     */
+    private void startCustomCamera() {
+        Intent intent = new Intent(this, PictureCustomCameraActivity.class);
+        startActivityForResult(intent, PictureConfig.REQUEST_CAMERA);
+        PictureWindowAnimationStyle windowAnimationStyle = PictureSelectionConfig.windowAnimationStyle;
+        overridePendingTransition(windowAnimationStyle.activityEnterAnimation, R.anim.picture_anim_fade_in);
+    }
+
+    /**
      * start to camera、preview、crop
      */
     protected void startOpenCameraImage() {
-        Intent cameraIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
-        if (cameraIntent.resolveActivity(getPackageManager()) != null) {
-            Uri imageUri;
-            String cameraFileName = null;
-            String imageFormat = TextUtils.isEmpty(config.cameraImageFormat) ? config.suffixType : config.cameraImageFormat;
-            int chooseMode = config.chooseMode == PictureConfig.TYPE_ALL ? PictureConfig.TYPE_IMAGE : config.chooseMode;
-            if (!TextUtils.isEmpty(config.cameraFileName)) {
-                boolean isSuffixOfImage = PictureMimeType.isSuffixOfImage(config.cameraFileName);
-                config.cameraFileName = !isSuffixOfImage ? StringUtils.renameSuffix(config.cameraFileName, PictureMimeType.JPG) : config.cameraFileName;
-                cameraFileName = config.camera ? config.cameraFileName : StringUtils.rename(config.cameraFileName);
-            }
-            if (SdkVersionUtils.checkedAndroid_Q()) {
-                if (TextUtils.isEmpty(config.outPutCameraPath)) {
-                    imageUri = MediaUtils.createImageUri(this, config.cameraFileName, imageFormat);
-                } else {
-                    File cameraFile = PictureFileUtils.createCameraFile(this,
-                            chooseMode, cameraFileName, imageFormat, config.outPutCameraPath);
-                    config.cameraPath = cameraFile.getAbsolutePath();
-                    imageUri = PictureFileUtils.parUri(this, cameraFile);
-                }
+        if (config.isUseCustomCamera) {
+            startCustomCamera();
+        } else {
+            Intent cameraIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+            if (cameraIntent.resolveActivity(getPackageManager()) != null) {
+                Uri imageUri = CameraFileUtils.createCameraOutImageUri(getContext(), config);
                 if (imageUri != null) {
-                    config.cameraPath = imageUri.toString();
+                    if (config.isCameraAroundState) {
+                        cameraIntent.putExtra(PictureConfig.CAMERA_FACING, PictureConfig.CAMERA_BEFORE);
+                    }
+                    cameraIntent.putExtra(MediaStore.EXTRA_OUTPUT, imageUri);
+                    startActivityForResult(cameraIntent, PictureConfig.REQUEST_CAMERA);
+                } else {
+                    ToastUtils.s(getContext(), "open is camera error，the uri is empty ");
+                    if (config.camera) {
+                        exit();
+                    }
                 }
-            } else {
-                File cameraFile = PictureFileUtils.createCameraFile(this, chooseMode, cameraFileName, imageFormat, config.outPutCameraPath);
-                config.cameraPath = cameraFile.getAbsolutePath();
-                imageUri = PictureFileUtils.parUri(this, cameraFile);
             }
-            if (imageUri == null) {
-                ToastUtils.s(getContext(), "open is camera error，the uri is empty ");
-                if (config.camera) {
-                    exit();
-                }
-                return;
-            }
-            config.cameraMimeType = PictureMimeType.ofImage();
-            if (config.isCameraAroundState) {
-                cameraIntent.putExtra(PictureConfig.CAMERA_FACING, PictureConfig.CAMERA_BEFORE);
-            }
-            cameraIntent.putExtra(MediaStore.EXTRA_OUTPUT, imageUri);
-            startActivityForResult(cameraIntent, PictureConfig.REQUEST_CAMERA);
         }
     }
 
@@ -723,49 +742,28 @@ public abstract class PictureBaseActivity extends AppCompatActivity {
      * start to camera、video
      */
     protected void startOpenCameraVideo() {
-        Intent cameraIntent = new Intent(MediaStore.ACTION_VIDEO_CAPTURE);
-        if (cameraIntent.resolveActivity(getPackageManager()) != null) {
-            Uri videoUri;
-            String cameraFileName = null;
-            String videoFormat = TextUtils.isEmpty(config.cameraVideoFormat) ? config.suffixType : config.cameraVideoFormat;
-            int chooseMode = config.chooseMode == PictureConfig.TYPE_ALL ? PictureConfig.TYPE_VIDEO : config.chooseMode;
-            if (!TextUtils.isEmpty(config.cameraFileName)) {
-                boolean isSuffixOfImage = PictureMimeType.isSuffixOfImage(config.cameraFileName);
-                config.cameraFileName = isSuffixOfImage ? StringUtils.renameSuffix(config.cameraFileName, PictureMimeType.MP4) : config.cameraFileName;
-                cameraFileName = config.camera ? config.cameraFileName : StringUtils.rename(config.cameraFileName);
-            }
-            if (SdkVersionUtils.checkedAndroid_Q()) {
-                if (TextUtils.isEmpty(config.outPutCameraPath)) {
-                    videoUri = MediaUtils.createVideoUri(this, config.cameraFileName, videoFormat);
-                } else {
-                    File cameraFile = PictureFileUtils.createCameraFile(this, chooseMode, cameraFileName, videoFormat, config.outPutCameraPath);
-                    config.cameraPath = cameraFile.getAbsolutePath();
-                    videoUri = PictureFileUtils.parUri(this, cameraFile);
-                }
+        if (config.isUseCustomCamera) {
+            startCustomCamera();
+        } else {
+            Intent cameraIntent = new Intent(MediaStore.ACTION_VIDEO_CAPTURE);
+            if (cameraIntent.resolveActivity(getPackageManager()) != null) {
+                Uri videoUri = CameraFileUtils.createCameraOutVideoUri(getContext(), config);
                 if (videoUri != null) {
-                    config.cameraPath = videoUri.toString();
+                    cameraIntent.putExtra(MediaStore.EXTRA_OUTPUT, videoUri);
+                    if (config.isCameraAroundState) {
+                        cameraIntent.putExtra(PictureConfig.CAMERA_FACING, PictureConfig.CAMERA_BEFORE);
+                    }
+                    cameraIntent.putExtra(PictureConfig.EXTRA_QUICK_CAPTURE, config.isQuickCapture);
+                    cameraIntent.putExtra(MediaStore.EXTRA_DURATION_LIMIT, config.recordVideoSecond);
+                    cameraIntent.putExtra(MediaStore.EXTRA_VIDEO_QUALITY, config.videoQuality);
+                    startActivityForResult(cameraIntent, PictureConfig.REQUEST_CAMERA);
+                } else {
+                    ToastUtils.s(getContext(), "open is camera error，the uri is empty ");
+                    if (config.camera) {
+                        exit();
+                    }
                 }
-            } else {
-                File cameraFile = PictureFileUtils.createCameraFile(this, chooseMode, cameraFileName, videoFormat, config.outPutCameraPath);
-                config.cameraPath = cameraFile.getAbsolutePath();
-                videoUri = PictureFileUtils.parUri(this, cameraFile);
             }
-            if (videoUri == null) {
-                ToastUtils.s(getContext(), "open is camera error，the uri is empty ");
-                if (config.camera) {
-                    exit();
-                }
-                return;
-            }
-            config.cameraMimeType = PictureMimeType.ofVideo();
-            cameraIntent.putExtra(MediaStore.EXTRA_OUTPUT, videoUri);
-            if (config.isCameraAroundState) {
-                cameraIntent.putExtra(PictureConfig.CAMERA_FACING, PictureConfig.CAMERA_BEFORE);
-            }
-            cameraIntent.putExtra(PictureConfig.EXTRA_QUICK_CAPTURE, config.isQuickCapture);
-            cameraIntent.putExtra(MediaStore.EXTRA_DURATION_LIMIT, config.recordVideoSecond);
-            cameraIntent.putExtra(MediaStore.EXTRA_VIDEO_QUALITY, config.videoQuality);
-            startActivityForResult(cameraIntent, PictureConfig.REQUEST_CAMERA);
         }
     }
 
@@ -777,21 +775,16 @@ public abstract class PictureBaseActivity extends AppCompatActivity {
             if (PermissionChecker.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)) {
                 Intent cameraIntent = new Intent(MediaStore.Audio.Media.RECORD_SOUND_ACTION);
                 if (cameraIntent.resolveActivity(getPackageManager()) != null) {
-                    config.cameraMimeType = PictureMimeType.ofAudio();
-                    String audioFormat = TextUtils.isEmpty(config.cameraAudioFormat) ? config.suffixType : config.cameraAudioFormat;
-                    if (SdkVersionUtils.checkedAndroid_Q()) {
-                        Uri audioUri = MediaUtils.createAudioUri(this, audioFormat);
-                        if (audioUri == null) {
-                            ToastUtils.s(getContext(), "open is audio error，the uri is empty ");
-                            if (config.camera) {
-                                exit();
-                            }
-                            return;
-                        }
-                        config.cameraPath = audioUri.toString();
+                    Uri audioUri = CameraFileUtils.createCameraOutAudioUri(getContext(), config);
+                    if (audioUri != null) {
                         cameraIntent.putExtra(MediaStore.EXTRA_OUTPUT, audioUri);
+                        startActivityForResult(cameraIntent, PictureConfig.REQUEST_CAMERA);
+                    } else {
+                        ToastUtils.s(getContext(), "open is audio error，the uri is empty ");
+                        if (config.camera) {
+                            exit();
+                        }
                     }
-                    startActivityForResult(cameraIntent, PictureConfig.REQUEST_CAMERA);
                 } else {
                     ToastUtils.s(getContext(), "System recording is not supported");
                 }
@@ -812,8 +805,8 @@ public abstract class PictureBaseActivity extends AppCompatActivity {
     private void releaseResultListener() {
         if (config != null) {
             PictureSelectionConfig.destroy();
-            LocalMediaPageLoader.setInstanceNull();
-            PictureThreadUtils.cancel(PictureThreadUtils.getSinglePool());
+            PictureThreadUtils.cancel(PictureThreadUtils.getIoPool());
+            ArrayPoolProvide.getInstance().clearMemory();
         }
     }
 

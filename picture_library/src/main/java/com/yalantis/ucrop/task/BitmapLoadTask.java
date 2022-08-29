@@ -48,7 +48,8 @@ public class BitmapLoadTask extends AsyncTask<Void, Void, BitmapLoadTask.BitmapW
     private final Uri mOutputUri;
     private final int mRequiredWidth;
     private final int mRequiredHeight;
-
+    private final int mInputImageWidth;
+    private final int mInputImageHeight;
     private final BitmapLoadCallback mBitmapLoadCallback;
 
     public static class BitmapWorkerResult {
@@ -71,12 +72,15 @@ public class BitmapLoadTask extends AsyncTask<Void, Void, BitmapLoadTask.BitmapW
     public BitmapLoadTask(@NonNull Context context,
                           @NonNull Uri inputUri, @Nullable Uri outputUri,
                           int requiredWidth, int requiredHeight,
+                          int imageWidth, int imageHeight,
                           BitmapLoadCallback loadCallback) {
         mContext = context;
         mInputUri = inputUri;
         mOutputUri = outputUri;
         mRequiredWidth = requiredWidth;
         mRequiredHeight = requiredHeight;
+        mInputImageWidth = imageWidth;
+        mInputImageHeight = imageHeight;
         mBitmapLoadCallback = loadCallback;
     }
 
@@ -95,7 +99,11 @@ public class BitmapLoadTask extends AsyncTask<Void, Void, BitmapLoadTask.BitmapW
 
         final BitmapFactory.Options options = new BitmapFactory.Options();
         options.inJustDecodeBounds = true;
-        options.inSampleSize = BitmapLoadUtils.calculateInSampleSize(options, mRequiredWidth, mRequiredHeight);
+        if (options.outWidth == 0 && options.outHeight == 0) {
+            options.inSampleSize = BitmapLoadUtils.calculateInSampleSize(mInputImageWidth, mInputImageHeight, mInputImageWidth, mInputImageHeight);
+        } else {
+            options.inSampleSize = BitmapLoadUtils.calculateInSampleSize(options.outWidth, options.outHeight, mRequiredWidth, mRequiredHeight);
+        }
         options.inJustDecodeBounds = false;
 
         Bitmap decodeSampledBitmap = null;
@@ -104,13 +112,9 @@ public class BitmapLoadTask extends AsyncTask<Void, Void, BitmapLoadTask.BitmapW
         while (!decodeAttemptSuccess) {
             try {
                 InputStream stream = PictureContentResolver.getContentResolverOpenInputStream(mContext, mInputUri);
-                try {
-                    decodeSampledBitmap = BitmapFactory.decodeStream(stream, null, options);
-                    if (options.outWidth == -1 || options.outHeight == -1) {
-                        return new BitmapWorkerResult(new IllegalArgumentException("Bounds for bitmap could not be retrieved from the Uri: [" + mInputUri + "]"));
-                    }
-                } finally {
-                    BitmapLoadUtils.close(stream);
+                decodeSampledBitmap = BitmapFactory.decodeStream(stream, null, options);
+                if (options.outWidth == -1 || options.outHeight == -1) {
+                    return new BitmapWorkerResult(new IllegalArgumentException("Bounds for bitmap could not be retrieved from the Uri: [" + mInputUri + "]"));
                 }
                 if (checkSize(decodeSampledBitmap, options)) continue;
                 decodeAttemptSuccess = true;
@@ -160,7 +164,7 @@ public class BitmapLoadTask extends AsyncTask<Void, Void, BitmapLoadTask.BitmapW
         } else if ("content".equals(inputUriScheme)) {
             String path = getFilePath();
             if (!TextUtils.isEmpty(path) && new File(path).exists()) {
-                mInputUri = SdkVersionUtils.checkedAndroid_Q() ? mInputUri : Uri.fromFile(new File(path));
+                mInputUri = SdkVersionUtils.isQ() ? mInputUri : Uri.fromFile(new File(path));
             } else {
                 try {
                     copyFile(mInputUri, mOutputUri);
@@ -195,7 +199,7 @@ public class BitmapLoadTask extends AsyncTask<Void, Void, BitmapLoadTask.BitmapW
         OutputStream outputStream = null;
         try {
             inputStream = PictureContentResolver.getContentResolverOpenInputStream(mContext, inputUri);
-            outputStream = new FileOutputStream(new File(outputUri.getPath()));
+            outputStream = new FileOutputStream(outputUri.getPath());
             if (inputStream == null) {
                 throw new NullPointerException("InputStream for given input Uri is null");
             }
