@@ -29,6 +29,7 @@ public class Luban implements Handler.Callback {
     private static final String KEY_SOURCE = "source";
     private String mTargetDir;
     private boolean focusAlpha;
+    private int compressQuality;
     private boolean isUseIOBufferPool;
     private int mLeastCompressSize;
     private OnRenameListener mRenameListener;
@@ -42,6 +43,7 @@ public class Luban implements Handler.Callback {
     private Luban(Builder builder) {
         this.mTargetDir = builder.mTargetDir;
         this.focusAlpha = builder.focusAlpha;
+        this.compressQuality = builder.compressQuality;
         this.isUseIOBufferPool = builder.isUseBufferPool;
         this.mRenameListener = builder.mRenameListener;
         this.mStreamProviders = builder.mStreamProviders;
@@ -171,7 +173,7 @@ public class Luban implements Handler.Callback {
      */
     private File get(InputStreamProvider input, Context context) throws IOException {
         try {
-            return new Engine(input, getImageCacheFile(context, Checker.SINGLE.extSuffix(input)), focusAlpha).compress();
+            return new Engine(input, getImageCacheFile(context, Checker.SINGLE.extSuffix(input)), focusAlpha, compressQuality).compress();
         } finally {
             input.close();
         }
@@ -210,14 +212,14 @@ public class Luban implements Handler.Callback {
         if (mCompressionPredicate != null) {
             if (mCompressionPredicate.apply(source)
                     && Checker.SINGLE.needCompress(mLeastCompressSize, source)) {
-                result = new Engine(path, outFile, focusAlpha).compress();
+                result = new Engine(path, outFile, focusAlpha, compressQuality).compress();
             } else {
                 // Ignore compression
                 result = new File("");
             }
         } else {
             result = Checker.SINGLE.needCompress(mLeastCompressSize, source) ?
-                    new Engine(path, outFile, focusAlpha).compress() : new File(source);
+                    new Engine(path, outFile, focusAlpha, compressQuality).compress() : new File(source);
         }
 
         return result;
@@ -259,6 +261,7 @@ public class Luban implements Handler.Callback {
         private Context context;
         private String mTargetDir;
         private boolean focusAlpha;
+        private int compressQuality = 80;
         private boolean isUseBufferPool = true;
         private int mLeastCompressSize = 100;
         private OnRenameListener mRenameListener;
@@ -411,6 +414,11 @@ public class Luban implements Handler.Callback {
         @Deprecated
         public Builder setFocusAlpha(boolean focusAlpha) {
             this.focusAlpha = focusAlpha;
+            return this;
+        }
+
+        public Builder setCompressQuality(int compressQuality) {
+            this.compressQuality = compressQuality;
             return this;
         }
 

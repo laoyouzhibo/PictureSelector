@@ -18,11 +18,13 @@ class Engine {
     private int srcWidth;
     private int srcHeight;
     private boolean focusAlpha;
+    private int compressQuality;
 
-    Engine(InputStreamProvider srcImg, File tagImg, boolean focusAlpha) throws IOException {
+    Engine(InputStreamProvider srcImg, File tagImg, boolean focusAlpha, int compressQuality) throws IOException {
         this.tagImg = tagImg;
         this.srcImg = srcImg;
         this.focusAlpha = focusAlpha;
+        this.compressQuality = compressQuality;
 
         BitmapFactory.Options options = new BitmapFactory.Options();
         options.inJustDecodeBounds = true;
@@ -76,7 +78,7 @@ class Engine {
         if (Checker.SINGLE.isJPG(srcImg.open())) {
             tagBitmap = rotatingImage(tagBitmap, Checker.SINGLE.getOrientation(srcImg.open()));
         }
-        tagBitmap.compress(focusAlpha || tagBitmap.hasAlpha() ? Bitmap.CompressFormat.PNG : Bitmap.CompressFormat.JPEG, 60, stream);
+        tagBitmap.compress(focusAlpha || tagBitmap.hasAlpha() ? Bitmap.CompressFormat.PNG : Bitmap.CompressFormat.JPEG, compressQuality, stream);
         tagBitmap.recycle();
 
         FileOutputStream fos = new FileOutputStream(tagImg);
