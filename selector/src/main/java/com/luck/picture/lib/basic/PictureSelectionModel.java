@@ -551,6 +551,16 @@ public final class PictureSelectionModel {
     }
 
     /**
+     * 原图是否要勾选
+     * @param isOriginalCheck
+     * @return
+     */
+    public PictureSelectionModel isOriginalCheck(boolean isOriginalCheck) {
+        selectionConfig.isCheckOriginalImage = isOriginalCheck;
+        return this;
+    }
+
+    /**
      * If SyncCover
      *
      * @param isSyncCover

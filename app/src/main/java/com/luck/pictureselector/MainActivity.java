@@ -506,6 +506,7 @@ public class MainActivity extends AppCompatActivity implements IBridgePictureBeh
                                 .isOnlyObtainSandboxDir(cb_only_dir.isChecked())
                                 .isPageStrategy(cbPage.isChecked())
                                 .isOriginalControl(cb_original.isChecked())
+                                .isOriginalCheck(true)
                                 .isDisplayCamera(cb_isCamera.isChecked())
                                 .isOpenClickSound(cb_voice.isChecked())
                                 .setSkipCropMimeType(getNotSupportCrop())
