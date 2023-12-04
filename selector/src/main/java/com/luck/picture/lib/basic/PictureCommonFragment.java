@@ -10,6 +10,7 @@ import android.app.Dialog;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.content.res.Configuration;
 import android.media.AudioManager;
 import android.media.SoundPool;
@@ -27,6 +28,9 @@ import android.view.animation.AnimationUtils;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.annotation.StringRes;
+import androidx.appcompat.app.AlertDialog;
+import androidx.core.app.ActivityCompat;
 import androidx.fragment.app.Fragment;
 
 import com.luck.picture.lib.R;
@@ -887,19 +891,47 @@ public abstract class PictureCommonFragment extends Fragment implements IPicture
         if (PictureSelectionConfig.onPermissionsEventListener != null) {
             onApplyPermissionsEvent(PermissionEvent.EVENT_IMAGE_CAMERA, PermissionConfig.CAMERA);
         } else {
-            PermissionChecker.getInstance().requestPermissions(this, PermissionConfig.CAMERA,
-                    new PermissionResultCallback() {
-                        @Override
-                        public void onGranted() {
-                            startCameraImageCapture();
-                        }
+            showPermissionsPreNoticeDialog(getActivity(), new PermissionAllowCallback() {
+                @Override
+                public void onAllowed() {
+                    PermissionChecker.getInstance().requestPermissions(PictureCommonFragment.this, PermissionConfig.CAMERA,
+                            new PermissionResultCallback() {
+                                @Override
+                                public void onGranted() {
+                                    startCameraImageCapture();
+                                }
 
-                        @Override
-                        public void onDenied() {
-                            handlePermissionDenied(PermissionConfig.CAMERA);
-                        }
-                    });
+                                @Override
+                                public void onDenied() {
+                                    handlePermissionDenied(PermissionConfig.CAMERA);
+                                }
+                            });
+                }
+            });
         }
+    }
+
+    private interface PermissionAllowCallback {
+        void onAllowed();
+    }
+    public static void showPermissionsPreNoticeDialog(final Context context, PermissionAllowCallback callback) {
+        if (ActivityCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+            callback.onAllowed();
+            return;
+        }
+
+        new AlertDialog.Builder(context)
+                .setTitle("权限申请")
+                .setMessage("用于帮助您拍摄发布音视频、进行直播、视频上麦、视频通话等需要使用该权限的相关功能")
+                .setPositiveButton("允许申请", (dialog, which) -> {
+                    callback.onAllowed();
+                    dialog.cancel();
+                })
+                .setNegativeButton("拒绝", (dialog, which) -> {
+                    dialog.cancel();
+                })
+                .setCancelable(false)
+                .show();
     }
 
     /**
